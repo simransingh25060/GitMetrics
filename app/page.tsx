@@ -4,15 +4,31 @@ import { useState } from "react";
 
 export default function Home() {
   const [username, setUsername] = useState("");
+  const [userData, setUserData] = useState<any>(null);
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!username.trim()) return;
 
-    console.log(username);
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username }),
+      });
+
+      const data = await response.json();
+      console.log(data);
+
+      setUserData(data);
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white">
+    <main className="min-h-screen  text-white">
       <section className="max-w-6xl mx-auto px-6 py-20">
         <div className="text-center">
           <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">
@@ -29,7 +45,6 @@ export default function Home() {
             and a personalized learning roadmap.
           </p>
 
-          {/* Search Box */}
           <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-4">
             <input
               type="text"
@@ -46,10 +61,43 @@ export default function Home() {
               Analyze Profile
             </button>
           </div>
+          {userData && (
+            <div className="mt-10 bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+              <img
+                src={userData.avatar_url}
+                alt={userData.login}
+                className="w-24 h-24 rounded-full mx-auto mb-4"
+              />
+
+              <h2 className="text-2xl font-bold">
+                {userData.name}
+              </h2>
+
+              <p className="text-zinc-400">@{userData.login}</p>
+
+              <p className="mt-4">{userData.bio}</p>
+
+              <div className="flex justify-center gap-8 mt-6">
+                <div>
+                  <p className="font-bold">{userData.followers}</p>
+                  <p>Followers</p>
+                </div>
+
+                <div>
+                  <p className="font-bold">{userData.following}</p>
+                  <p>Following</p>
+                </div>
+
+                <div>
+                  <p className="font-bold">{userData.public_repos}</p>
+                  <p>Repos</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Features */}
       <section className="max-w-6xl mx-auto px-6 pb-20">
         <h3 className="text-3xl font-bold text-center mb-12">
           What You'll Get
@@ -101,7 +149,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Trust Section */}
       <section className="max-w-6xl mx-auto px-6 pb-20">
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8">
           <h3 className="text-2xl font-bold text-center mb-8">
@@ -132,7 +179,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Results Section */}
       <section className="max-w-6xl mx-auto px-6 pb-10">
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 min-h-[50px]">
           <h3 className="text-2xl font-bold mb-4">Analysis Results</h3>
