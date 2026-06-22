@@ -1,16 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function Home() {
   const [username, setUsername] = useState("");
   const [userData, setUserData] = useState<any>(null);
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(false);
+
 
   const handleAnalyze = async () => {
     if (!username.trim()) return;
 
     try {
-      const response = await fetch("/api/analyze", {
+      // 1. Fetch profile first
+      const profileRes = await fetch("/api/profile", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -18,17 +25,34 @@ export default function Home() {
         body: JSON.stringify({ username }),
       });
 
-      const data = await response.json();
-      console.log(data);
+      const profileData = await profileRes.json();
 
-      setUserData(data);
+      setUserData(profileData);
+
+      // 2. Start report loading
+      setLoadingReport(true);
+
+      // 3. Generate AI report
+      const reportRes = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username }),
+      });
+
+      const reportData = await reportRes.json();
+
+      setAnalysis(reportData.analysis);
     } catch (error) {
       console.log(error);
+    } finally {
+      setLoadingReport(false);
     }
   };
 
   return (
-    <main className="min-h-screen  text-white">
+    <main className="min-h-screen text-white">
       <section className="max-w-6xl mx-auto px-6 py-20">
         <div className="text-center">
           <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">
@@ -94,6 +118,80 @@ export default function Home() {
                 </div>
               </div>
             </div>
+          )}
+        </div>
+      </section>
+
+      <section className="max-w-6xl mx-auto px-6 pb-10">
+        <div className="bg-zinc-900/80 backdrop-blur-lg border border-zinc-800 rounded-3xl p-8">
+          <h3 className="text-2xl font-bold mb-6">
+            AI Analysis Report
+          </h3>
+
+          {loadingReport ? (
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+              <p>Generating AI Insights...</p>
+            </div>
+          ) : analysis ? (
+            <>
+              {/* Score Card */}
+              <div className="bg-gradient-to-r from-blue-600 to-cyan-500 p-6 rounded-2xl mb-6">
+                <h2 className="text-lg">GitHub Score</h2>
+                <p className="text-5xl font-bold">
+                  {analysis.score}/100
+                </p>
+              </div>
+
+              {/* Strengths & Weaknesses */}
+              <div className="grid md:grid-cols-2 gap-6 mb-6">
+                <div className="bg-zinc-900 border border-green-500/20 rounded-2xl p-6">
+                  <h3 className="text-xl font-semibold mb-3">
+                    💪 Strengths
+                  </h3>
+
+                  <ul className="space-y-2">
+                    {analysis.strengths?.map(
+                      (strength: string, index: number) => (
+                        <li key={index}>✓ {strength}</li>
+                      )
+                    )}
+                  </ul>
+                </div>
+
+                <div className="bg-zinc-900 border border-red-500/20 rounded-2xl p-6">
+                  <h3 className="text-xl font-semibold mb-3">
+                    ⚠️ Weaknesses
+                  </h3>
+
+                  <ul className="space-y-2">
+                    {analysis.weaknesses?.map(
+                      (weakness: string, index: number) => (
+                        <li key={index}>• {weakness}</li>
+                      )
+                    )}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Markdown Report */}
+              <div className="prose prose-invert max-w-none">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-6">
+                  <h3 className="text-xl font-semibold mb-3">
+                    📋 Overview
+                  </h3>
+
+                  <p className="text-zinc-300">
+                    {analysis.overview}
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-zinc-500">
+              Enter a GitHub username and click Analyze Profile to
+              generate an AI-powered report.
+            </p>
           )}
         </div>
       </section>
@@ -176,17 +274,6 @@ export default function Home() {
               <p>Personalized Insights</p>
             </div>
           </div>
-        </div>
-      </section>
-
-      <section className="max-w-6xl mx-auto px-6 pb-10">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 min-h-[50px]">
-          <h3 className="text-2xl font-bold mb-4">Analysis Results</h3>
-
-          <p className="text-zinc-500">
-            Enter a GitHub username and click Analyze Profile to generate an
-            AI-powered report.
-          </p>
         </div>
       </section>
     </main>
