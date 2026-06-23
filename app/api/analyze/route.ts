@@ -7,61 +7,50 @@ import {
 } from "@/lib/github";
 
 import { model } from "@/lib/gemini";
+import { calculateScore } from "@/lib/scoring";
 
 export async function POST(req: Request) {
     try {
         const { username } = await req.json();
 
         const user = await getGithubUser(username);
-
         const repos = await getGithubRepos(username);
 
-        //pick top 5 starred repos
+        // pick top 5 starred repos
         const selectedRepos = repos
             .sort(
-                (a, b) =>
+                (a: any, b: any) =>
                     b.stargazers_count -
                     a.stargazers_count
             )
             .slice(0, 5);
 
+        const languages: Record<string, number> = {};
         let totalStars = 0;
 
-        const languages: Record<string, number> = {};
-
-        //fetch repo languages
-        const languageResults =
-            await Promise.allSettled(
-                selectedRepos.map((repo) =>
-                    getRepoLanguages(
-                        username,
-                        repo.name
-                    )
-                )
-            );
-
-        selectedRepos.forEach((repo, index) => {
+        // fetch repo languages sequentially to avoid rate-limit spikes
+        for (const repo of selectedRepos) {
             totalStars += repo.stargazers_count;
 
-            const result =
-                languageResults[index];
-
-            if (
-                result.status === "fulfilled"
-            ) {
+            try {
                 const repoLanguages =
-                    result.value as Record<
-                        string,
-                        number
-                    >;
+                    await getRepoLanguages(
+                        username,
+                        repo.name
+                    );
 
                 for (const lang in repoLanguages) {
                     languages[lang] =
                         (languages[lang] || 0) +
                         repoLanguages[lang];
                 }
+            } catch (error) {
+                console.error(
+                    `Failed to fetch languages for ${repo.name}`,
+                    error
+                );
             }
-        });
+        }
 
         const topLanguages = Object.entries(
             languages
@@ -81,6 +70,8 @@ export async function POST(req: Request) {
             topLanguages,
         };
 
+        const calculatedScore = calculateScore(summary);
+
         const prompt = `
 Analyze this GitHub profile:
 
@@ -89,7 +80,7 @@ ${JSON.stringify(summary, null, 2)}
 Return ONLY valid JSON.
 
 {
-  "score": 0,
+  "score": ${calculatedScore},
   "overview": "",
   "strengths": [],
   "weaknesses": [],
@@ -99,7 +90,7 @@ Return ONLY valid JSON.
 }
 
 Rules:
-- score must be between 0 and 100
+- The profile score is pre-calculated to be exactly ${calculatedScore}. You MUST return this exact score value in the "score" field.
 - strengths: 3-5 items
 - weaknesses: 3-5 items
 - topSkills: 3-5 items
@@ -110,13 +101,12 @@ Rules:
 
         let result: any = null;
 
-        //retry gem
+        // retry gemini
         for (let i = 0; i < 3; i++) {
             try {
-                result =
-                    await model.generateContent(
-                        prompt
-                    );
+                result = await model.generateContent(
+                    prompt
+                );
                 break;
             } catch (error: any) {
                 console.error(
@@ -128,12 +118,11 @@ Rules:
                     throw error;
                 }
 
-                await new Promise(
-                    (resolve) =>
-                        setTimeout(
-                            resolve,
-                            2000 * (i + 1)
-                        )
+                await new Promise((resolve) =>
+                    setTimeout(
+                        resolve,
+                        2000 * (i + 1)
+                    )
                 );
             }
         }
@@ -144,8 +133,7 @@ Rules:
             );
         }
 
-        const text =
-            result.response.text();
+        const text = result.response.text();
 
         const cleanedText = text
             .replace(/```json/g, "")
@@ -155,8 +143,9 @@ Rules:
         let analysis;
 
         try {
-            analysis =
-                JSON.parse(cleanedText);
+            analysis = JSON.parse(cleanedText);
+            // Enforce deterministic scoring
+            analysis.score = calculatedScore;
         } catch {
             console.error(
                 "Gemini Response:",

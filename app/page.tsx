@@ -16,7 +16,7 @@ export default function Home() {
     if (!username.trim()) return;
 
     try {
-      // 1. Fetch profile first
+
       const profileRes = await fetch("/api/profile", {
         method: "POST",
         headers: {
@@ -29,10 +29,8 @@ export default function Home() {
 
       setUserData(profileData);
 
-      // 2. Start report loading
       setLoadingReport(true);
 
-      // 3. Generate AI report
       const reportRes = await fetch("/api/analyze", {
         method: "POST",
         headers: {
@@ -135,7 +133,7 @@ export default function Home() {
             </div>
           ) : analysis ? (
             <>
-              {/* Score Card */}
+
               <div className="bg-gradient-to-r from-blue-600 to-cyan-500 p-6 rounded-2xl mb-6">
                 <h2 className="text-lg">GitHub Score</h2>
                 <p className="text-5xl font-bold">
@@ -143,7 +141,6 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Strengths & Weaknesses */}
               <div className="grid md:grid-cols-2 gap-6 mb-6">
                 <div className="bg-zinc-900 border border-green-500/20 rounded-2xl p-6">
                   <h3 className="text-xl font-semibold mb-3">
